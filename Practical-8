@@ -1,0 +1,43 @@
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import folium
+from shapely.geometry import Point
+
+# Step 1: Prepare Data
+data = {'Name': ['Point A', 'Point B'],
+        'Latitude': [23.7104, 34.0522],
+        'Longitude': [90.40744, -118.2437]}
+geometry = [Point(xy) for xy in zip(data['Longitude'], data['Latitude'])]
+gdf = gpd.GeoDataFrame(data, geometry=geometry)
+# Export GeoDataFrame to Shapefile
+gdf.to_file("/content/data.shp")
+
+
+# Display the first few rows of the GeoDataFrame
+print(gdf.head())
+# Check the data types and null values
+print(gdf.info())
+# Summary statistics
+print(gdf.describe())
+
+# Drop null values
+gdf_clean = gdf.dropna()
+# Check for and handle any inconsistencies or errors in the data
+# For example, fixing invalid geometries
+gdf_clean = gdf_clean[gdf_clean.is_valid]
+
+
+# Plot the data using Matplotlib
+gdf.plot(figsize=(10, 10), cmap='viridis')
+plt.show()
+# Create an interactive map using Folium
+# Define the latitude and longitude coordinates
+latitude = 23.7104   # Example latitude
+longitude = 90.40744  # Example longitude
+# Create a map centered at the specified location
+m = folium.Map(location=[latitude, longitude], zoom_start=10)
+# Set the CRS of the GeoDataFrame
+gdf.set_crs(epsg=4326, inplace=True)
+# Add the GeoDataFrame to the map
+folium.GeoJson(gdf).add_to(m)
+m.save('map.html')
