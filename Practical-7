@@ -1,0 +1,89 @@
+# Install Required Libraries
+import geopandas as gpd
+from pyproj import CRS
+from geopy.geocoders import Nominatim
+import time
+import geopandas as gpd
+import pandas as pd
+import numpy as np
+import osmnx as ox 
+import rasterio
+from rasterio.transform import from_origin
+import folium
+import rasterio
+from rasterio.plot import show
+
+# Load a shapefile
+gdf = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+# Save the GeoDataFrame to different file formats
+gdf.to_file('output_shapefile.shp')
+gdf.to_file('output_geojson.geojson', driver='GeoJSON')
+
+# Original CRS
+print("Original CRS:", gdf.crs)
+# Reproject to a different CRS
+gdf_reprojected = gdf.to_crs(CRS.from_epsg(3857))  # Web Mercator
+print("Reprojected CRS:", gdf_reprojected.crs)
+
+# Buffer operation
+gdf['geometry'] = gdf.buffer(1.0)
+# Spatial query: Selecting geometries that intersect with a given geometry
+from shapely.geometry import Point
+point = Point(0, 0)
+gdf_query = gdf[gdf.intersects(point)]
+
+# Use a more descriptive User-Agent
+geolocator = Nominatim(user_agent="my-geocoding-app")  
+# Address to Point (Geocoding)
+location = geolocator.geocode("Dhaka University of Engineering and Technology, Bangladesh")
+print((location.latitude, location.longitude))
+# Introduce a delay to avoid rate limiting
+time.sleep(1)  
+# Point to Address (Reverse Geocoding)
+location = geolocator.reverse("24.0176242, 90.41863852701456")
+print(location.address)
+
+# Reclassify based on population
+gdf['pop_density'] = gdf['pop_est'] / gdf['geometry'].area
+gdf['density_class'] = pd.cut(gdf['pop_density'], bins=[0, 50, 100, 500, 1000, np.inf], labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+
+# Fetching OSM data
+place_name = "Piedmont, California, USA"
+gdf_osm = ox.geometries_from_place(place_name, tags={'building': True})
+
+def create_raster(file_path, width, height, num_bands=1, dtype='uint8', crs='EPSG:4326', transform=None):
+    # Generate random data for the raster
+    data = np.random.randint(0, 255, size=(height, width), dtype=dtype)
+    # Define the transform if not provided
+    if transform is None:
+        transform = from_origin(0, 100, 1, 1)  # Default transform (origin x, origin y, pixel width, pixel height)
+    # Define the metadata for the raster file
+    metadata = {
+        'driver': 'GTiff',
+        'count': num_bands,
+        'height': height,
+        'width': width,
+        'dtype': dtype,
+        'crs': crs,
+        'transform': transform,
+    }
+    # Create and write the raster file
+    with rasterio.open(file_path, 'w', **metadata) as dst:
+        dst.write(data, 1)   
+          #print(f"Raster file created at {file_path}")
+# Step 3: Define the parameters and create the raster file
+output_path = 'automatic_raster.tif'
+raster_width = 100
+raster_height = 100
+# Create the raster file automatically
+create_raster(output_path, raster_width, raster_height)
+# Step 4: Load and display the created raster file
+raster = rasterio.open(output_path)
+show(raster)
+
+# Create a map centered around a location
+m = folium.Map(location=[37.7749, -122.4194], zoom_start=12)
+# Add a marker
+folium.Marker([37.7749, -122.4194], popup='San Francisco').add_to(m)
+# Save the map to an HTML file
+m.save('map.html')
