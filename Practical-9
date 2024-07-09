@@ -1,0 +1,84 @@
+import sqlite3
+
+# Set up the environment
+conn = sqlite3.connect('library.db')
+
+# Create a table for books
+create_books_table_query = """
+CREATE TABLE IF NOT EXISTS books (
+    id INTEGER PRIMARY KEY,
+    title TEXT,
+    author TEXT,
+    price REAL,
+    available INTEGER
+);
+"""
+
+conn.execute(create_books_table_query)
+
+# Define functions to add a new book, buy available books, and exit
+def add_book():
+    title = input("Enter book title: ")
+    author = input("Enter author name: ")
+    price = float(input("Enter price: "))
+    available = int(input("Enter number of available copies: "))
+
+    insert_query = "INSERT INTO books (title, author, price, available) VALUES (?, ?, ?, ?)"
+    conn.execute(insert_query, (title, author, price, available))
+    conn.commit()
+    print("Book added successfully!")
+
+def buy_books():
+    print("Available books:")
+    select_query = "SELECT title FROM books WHERE available > 0"
+    cursor = conn.execute(select_query)
+    available_books = cursor.fetchall()
+    for index, book in enumerate(available_books, start=1):
+        print(f"{index}. {book[0]}")
+    if available_books:
+        try:
+            book_indices = list(map(int, input("Enter the indices of the books you want to buy (comma-separated): ").split(',')))
+            total_price = 0
+            for index in book_indices:
+                title = available_books[index - 1][0]
+                select_query = "SELECT price, available FROM books WHERE title = ?"
+                cursor = conn.execute(select_query, (title,))
+                book = cursor.fetchone()
+                quantity = int(input(f"Enter the quantity of '{title}' you want to buy: "))
+                if quantity <= book[1]:
+                    total_price += book[0] * quantity
+                    remaining = book[1] - quantity
+                    update_query = "UPDATE books SET available = ? WHERE title = ?"
+                    conn.execute(update_query, (remaining, title))
+                    conn.commit()
+                    print(f"{quantity} copies of '{title}' bought successfully!")
+                else:
+                    print(f"Sorry, only {book[1]} copies of '{title}' are available.")
+            print(f"Total price for the selected books: TK.{total_price}")
+        except Exception as e:
+            print("Invalid input. Please try again.")
+    else:
+        print("No available books in the library.")
+
+def exit_program():
+    print("Exiting the program.")
+    conn.close()
+    exit()
+
+# Main loop to interact with the user
+while True:
+    print("\nLibrary Management System")
+    print("1. Add new book item")
+    print("2. Buy different available books and calculate total price")
+    print("3. Exit")
+
+    choice = input("Enter your choice: ")
+
+    if choice == '1':
+        add_book()
+    elif choice == '2':
+        buy_books()
+    elif choice == '3':
+        exit_program()
+    else:
+        print("Invalid choice. Please try again.")
